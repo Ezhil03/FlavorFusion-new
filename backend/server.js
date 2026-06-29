@@ -14,35 +14,56 @@ import favoriteRoutes from "./routes/favoriteRoutes.js";
 dotenv.config();
 
 const app = express();
-
 const PORT = process.env.PORT || 5000;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ============================
-// Middleware
-// ============================
+/* ============================
+   CORS Configuration
+============================ */
+
+const allowedOrigins = [
+  "https://flavorfusionnew.netlify.app",
+];
 
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "*",
+    origin: function (origin, callback) {
+      // Allow requests with no origin (Postman, mobile apps)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.use(express.json());
+// Handle preflight requests
+app.options("*", cors());
+
+/* ============================
+   Middleware
+============================ */
+
+app.use(express.json({ limit: "20mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ============================
-// Static Files
-// ============================
+/* ============================
+   Static Files
+============================ */
 
 app.use("/uploads", express.static(path.join(__dirname, "../uploads")));
 
-// ============================
-// Routes
-// ============================
+/* ============================
+   Routes
+============================ */
 
 app.get("/", (req, res) => {
   res.status(200).json({
@@ -55,7 +76,10 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({
     success: true,
     status: "OK",
-    database: mongoose.connection.readyState === 1 ? "Connected" : "Disconnected",
+    database:
+      mongoose.connection.readyState === 1
+        ? "Connected"
+        : "Disconnected",
   });
 });
 
@@ -65,9 +89,9 @@ app.use("/api/recipes", recipeRoutes);
 app.use("/api/mealplans", mealPlanRoutes);
 app.use("/api/favorites", favoriteRoutes);
 
-// ============================
-// 404
-// ============================
+/* ============================
+   404
+============================ */
 
 app.use((req, res) => {
   res.status(404).json({
@@ -76,9 +100,9 @@ app.use((req, res) => {
   });
 });
 
-// ============================
-// Error Handler
-// ============================
+/* ============================
+   Error Handler
+============================ */
 
 app.use((err, req, res, next) => {
   console.error(err);
@@ -89,16 +113,16 @@ app.use((err, req, res, next) => {
   });
 });
 
-// ============================
-// MongoDB Connection
-// ============================
+/* ============================
+   MongoDB
+============================ */
 
 async function startServer() {
   try {
     console.log("Connecting to MongoDB...");
 
     if (!process.env.MONGODB_URI) {
-      throw new Error("MONGODB_URI is missing in environment variables.");
+      throw new Error("MONGODB_URI environment variable is missing.");
     }
 
     await mongoose.connect(process.env.MONGODB_URI, {
